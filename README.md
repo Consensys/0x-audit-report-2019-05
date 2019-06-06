@@ -15,9 +15,10 @@
 * [5 Key Observations/Recommendations](#5-key-observationsrecommendations)
 * [6 Issues](#6-issues)
   * [6.1 Asset data manipulation can lead to unexpected trade outcomes](#61-asset-data-manipulation-can-lead-to-unexpected-trade-outcomes)
-  * [6.2 Consider using `safeTransferFrom` for single-asset transfers](#62-consider-using-safetransferfrom-for-single-asset-transfers)
-  * [6.3 Copying more data than necessary](#63-copying-more-data-than-necessary)
-  * [6.4 For consistency and simplicity, `assetDataOffset` should account for the function selector](#64-for-consistency-and-simplicity-assetdataoffset-should-account-for-the-function-selector)
+  * [6.2 Check for invalid offsets and lengths](#62-check-for-invalid-offsets-and-lengths)
+  * [6.3 Consider using `safeTransferFrom` for single-asset transfers](#63-consider-using-safetransferfrom-for-single-asset-transfers)
+  * [6.4 Copying more data than necessary](#64-copying-more-data-than-necessary)
+  * [6.5 For consistency and simplicity, `assetDataOffset` should account for the function selector](#65-for-consistency-and-simplicity-assetdataoffset-should-account-for-the-function-selector)
 * [Appendix 1  - Disclosure](#appendix-1----disclosure)
 
 
@@ -185,16 +186,17 @@ The following table contains all the issues discovered during the audit, ordered
 
 | Chapter      | Issue Title             | Issue Status | Severity    |
 |:------------:| ----------------------- |:------------:|:-----------:|
-| 6.1  | [Asset data manipulation can lead to unexpected trade outcomes](#61-asset-data-manipulation-can-lead-to-unexpected-trade-outcomes) | Open  | Major |
-| 6.2  | [Consider using `safeTransferFrom` for single-asset transfers](#62-consider-using-safetransferfrom-for-single-asset-transfers) | Open  | Minor |
-| 6.3  | [Copying more data than necessary](#63-copying-more-data-than-necessary) | Open  | Minor |
-| 6.4  | [For consistency and simplicity, `assetDataOffset` should account for the function selector](#64-for-consistency-and-simplicity-assetdataoffset-should-account-for-the-function-selector) | Open  | Minor |
+| 6.1  | [Asset data manipulation can lead to unexpected trade outcomes](#61-asset-data-manipulation-can-lead-to-unexpected-trade-outcomes) | Closed  | Major |
+| 6.2  | [Check for invalid offsets and lengths](#62-check-for-invalid-offsets-and-lengths) | Closed  | Minor |
+| 6.3  | [Consider using `safeTransferFrom` for single-asset transfers](#63-consider-using-safetransferfrom-for-single-asset-transfers) | Closed  | Minor |
+| 6.4  | [Copying more data than necessary](#64-copying-more-data-than-necessary) | Closed  | Minor |
+| 6.5  | [For consistency and simplicity, `assetDataOffset` should account for the function selector](#65-for-consistency-and-simplicity-assetdataoffset-should-account-for-the-function-selector) | Closed  | Minor |
 
 ### 6.1 Asset data manipulation can lead to unexpected trade outcomes
 
 | Severity     | Status    | Remediation Comment |
 |:------------:|:---------:| ------------------- |
-| Major | Open | This issue is currently under review. |
+| Major | Closed | Fixed in https://github.com/0xProject/0x-monorepo/pull/1837. |
 
 #### Description
 
@@ -252,11 +254,26 @@ This issue is partially mitigated by the fact that the function selector (hardco
 #### Remediation
 
 We recommend doing some validation of the ABI-encoded asset data. Specifically, each different field in the data should have to occupy non-overlapping regions in the call data. With such validation in place, simple ABI decoding of the asset data should reveal exactly what will be traded.
-### 6.2 Consider using `safeTransferFrom` for single-asset transfers
+### 6.2 Check for invalid offsets and lengths
 
 | Severity     | Status    | Remediation Comment |
 |:------------:|:---------:| ------------------- |
-| Minor | Open | This issue is currently under review. |
+| Minor | Closed | Fixed in https://github.com/0xProject/0x-monorepo/pull/1837. No check was added for walking past the end of the passed-in call data, but this is handled at the EVM level by just returning zeros, which seems harmless. |
+
+#### Description
+
+If the `values` offset is near the end of call data, you can end up reading some bogus values (e.g. the function selector as some asset value). In some sense, this is just what the data says, but note that Solidity has some sanity checks that don’t let this sort of thing happen. E.g. although at the EVM level you can read call data beyond `calldatasize` and get zeros, Solidity when decoding an array checks the length and just refuses.
+
+It would make sense for this code to perform similar checks.
+
+#### Remediation
+
+Perhaps there should be some sanity checks around offsets and lengths. E.g. offsets should be within `calldatasize`, array lengths shouldn’t overflow when converted to byte lengths, and adding the byte length to the offset should also not exceed `calldatasize`.
+### 6.3 Consider using `safeTransferFrom` for single-asset transfers
+
+| Severity     | Status    | Remediation Comment |
+|:------------:|:---------:| ------------------- |
+| Minor | Closed | From the client: We intend on continuing to use batch transfers for this implementation. Depending on how it gets used, we may create a separate single transfer version in the future. |
 
 #### Description
 
@@ -267,11 +284,11 @@ The `ERC1155Proxy` only uses `safeBatchTransferFrom`, even for single transfers,
 #### Remediation
 
 Consider differentiating between single and batch transfers and calling the corresponding functions of ERC-1155 contract.
-### 6.3 Copying more data than necessary
+### 6.4 Copying more data than necessary
 
 | Severity     | Status    | Remediation Comment |
 |:------------:|:---------:| ------------------- |
-| Minor | Open | This issue is currently under review. |
+| Minor | Closed | No longer an issue in https://github.com/0xProject/0x-monorepo/pull/1837. |
 
 #### Description
 
@@ -320,11 +337,11 @@ calldatacopy(
 ```
 
 Note that the subtraction allows for an integer underflow that doesn't matter... the caller can specify an arbitrary `assetDataLength` anyway.
-### 6.4 For consistency and simplicity, `assetDataOffset` should account for the function selector
+### 6.5 For consistency and simplicity, `assetDataOffset` should account for the function selector
 
 | Severity     | Status    | Remediation Comment |
 |:------------:|:---------:| ------------------- |
-| Minor | Open | This issue is currently under review. |
+| Minor | Closed | Fixed in https://github.com/0xProject/0x-monorepo/pull/1837. |
 
 #### Description
 
