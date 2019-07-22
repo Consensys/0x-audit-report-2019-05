@@ -4,6 +4,7 @@
 
 <img height="100px" Hspace="30" Vspace="10" align="right" src="static-content/diligence.png"/>
 
+* [0 July 2019 Update](#0-july-2019-update)
 * [1 Summary](#1-summary)
 * [2 System Overview](#2-system-overview)
   * [2.1 Detailed Design](#21-detailed-design)
@@ -21,6 +22,13 @@
   * [6.5 For consistency and simplicity, `assetDataOffset` should account for the function selector](#65-for-consistency-and-simplicity-assetdataoffset-should-account-for-the-function-selector)
 * [Appendix 1  - Disclosure](#appendix-1----disclosure)
 
+## 0 July 2019 Update
+
+As of July 2019, there is a [new Solidity-based version of the `ERC1155Proxy` contract](https://github.com/0xProject/0x-monorepo/blob/77484dc69eea1f4f1a8397590199f3f2489751d2/contracts/asset-proxy/contracts/src/ERC1155Proxy.sol). ConsenSys Diligence has conducted an audit of this new contract and found it to be functionality equivalent to the original.
+
+The only security concern with the new code is the use of [`LibBytes.sliceDestructive`](https://github.com/0xProject/0x-monorepo/blob/d35a053efdc8f49815ca80be0c278475c6af5238/contracts/utils/contracts/src/LibBytes.sol#L196-L226), which is written in assembly and takes a hard dependency on the memory layout for `bytes` arrays. Inline assembly is inherently risky, but most of the risk here is that future versions of Solidity might change the way `bytes` arrays are represented in memory. This is a maintenance problem rather than a concern with the current code.
+
+The Solidity alternative would require copying the data byte by byte, which would increase gas costs linearly with the size of the data. The assembly solution was deemed worth the risk because it reduces this to a constant cost in a relatively simple way. Due to a number of teams' dependencies on the current memory layout, we believe it is unlikely that Solidity will break this in the future in a minor release. Explicit tests for memory layout are being added by the 0x team to ensure that such changes would be immediately detected.
 
 ## 1 Summary
 
